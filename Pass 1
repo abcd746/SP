@@ -1,0 +1,189 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX_INSTRUCTIONS 100
+#define MAX_SYMBOLS 50
+#define MAX_LITERALS 50
+#define MAX_POOL 50
+
+typedef struct {
+    char mnemonic[10];
+    int opcode;
+    int size;
+} MOTEntry;
+
+typedef struct {
+    char symbol[10];
+    int address;
+} SymbolTableEntry;
+
+typedef struct {
+    int index;
+    char literal[10];
+    int address;
+} LiteralTableEntry;
+
+typedef struct {
+    int index;
+    int literalIndex;
+} PoolTableEntry;
+
+typedef struct {
+    int relativeAddress;
+    char mnemonic[10];
+    char operand[10];
+} IntermediateCodeEntry;
+
+// Mnemonic Operation Table (MOT)
+MOTEntry mot[] = {
+    {"MOV", 1, 2}, {"ADD", 2, 2}, {"SUB", 3, 2}, {"MUL", 4, 2}, {"DIV", 5, 2},
+    {"AND", 6, 2}, {"OR", 7, 2}, {"LOAD", 8, 2}, {"STORE", 9, 2}, {"DCR", 10, 1},
+    {"INC", 11, 1}, {"JMP", 12, 2}, {"JNZ", 13, 2}, {"HALT", 14, 1}
+};
+int motSize = sizeof(mot) / sizeof(mot[0]);
+
+SymbolTableEntry symbolTable[MAX_SYMBOLS];
+int symbolCount = 0;
+
+LiteralTableEntry literalTable[MAX_LITERALS];
+int literalCount = 0;
+
+PoolTableEntry poolTable[MAX_POOL];
+int poolCount = 0;
+
+IntermediateCodeEntry intermediateCode[MAX_INSTRUCTIONS];
+int intermediateCount = 0;
+
+int relativeAddress = 0;
+char errors[MAX_INSTRUCTIONS][100];
+int errorCount = 0;
+
+int getMOTIndex(char *mnemonic) {
+    for (int i = 0; i < motSize; i++) {
+        if (strcmp(mot[i].mnemonic, mnemonic) == 0) return i;
+    }
+    return -1;
+}
+
+int addSymbol(char *symbol) {
+    for (int i = 0; i < symbolCount; i++) {
+        if (strcmp(symbolTable[i].symbol, symbol) == 0) return symbolTable[i].address;
+    }
+    symbolTable[symbolCount].address = relativeAddress;
+    strcpy(symbolTable[symbolCount++].symbol, symbol);
+    return relativeAddress;
+}
+
+void addLiteral(char *literal) {
+    for (int i = 0; i < literalCount; i++) {
+        if (strcmp(literalTable[i].literal, literal) == 0) return;
+    }
+    literalTable[literalCount].index = literalCount;
+    strcpy(literalTable[literalCount++].literal, literal);
+    poolTable[poolCount++].literalIndex = literalCount - 1;
+}
+
+void printTables() {
+    printf("\nLine Counter [LC]\n");
+    printf("+------+-------------+--------------+\n");
+    printf("| Line | Instruction | Machine Code |\n");
+    printf("+------+-------------+--------------+\n");
+    for (int i = 0; i < intermediateCount; i++) {
+        printf("| %4d | %11s | %12s |\n", i, intermediateCode[i].mnemonic, intermediateCode[i].operand);
+    }
+    printf("+------+-------------+--------------+\n");
+
+    printf("\nMnemonic Operation Table [MOT]\n");
+    printf("+----------+--------+------+\n");
+    printf("| Mnemonic | OpCode | Size |\n");
+    printf("+----------+--------+------+\n");
+    for (int i = 0; i < motSize; i++) {
+        printf("| %8s | %6d | %4d |\n", mot[i].mnemonic, mot[i].opcode, mot[i].size);
+    }
+    printf("+----------+--------+------+\n");
+
+    printf("\nSymbol Table [ST]\n");
+    printf("+--------+---------+\n");
+    printf("| Symbol | Address |\n");
+    printf("+--------+---------+\n");
+    for (int i = 0; i < symbolCount; i++) {
+        printf("| %6s | %7d |\n", symbolTable[i].symbol, symbolTable[i].address);
+    }
+    printf("+--------+---------+\n");
+
+    printf("\nLiteral Table [LT]\n");
+    printf("+-------+---------+---------+\n");
+    printf("| Index | Literal | Address |\n");
+    printf("+-------+---------+---------+\n");
+    for (int i = 0; i < literalCount; i++) {
+        printf("| %5d | %7s | %7d |\n", literalTable[i].index, literalTable[i].literal, literalTable[i].address);
+    }
+    printf("+-------+---------+---------+\n");
+
+    printf("\nPool Table [PT]\n");
+    printf("+-------+---------------+\n");
+    printf("| Index | Literal Index |\n");
+    printf("+-------+---------------+\n");
+    for (int i = 0; i < poolCount; i++) {
+        printf("| %5d | %13d |\n", i, poolTable[i].literalIndex);
+    }
+    printf("+-------+---------------+\n");
+
+    printf("\nIntermediate Code [IC]\n");
+    printf("+------------------+----------+---------+\n");
+    printf("| Relative Address | Mnemonic | Operand |\n");
+    printf("+------------------+----------+---------+\n");
+    for (int i = 0; i < intermediateCount; i++) {
+        printf("| %16d | %8s | %7s |\n", intermediateCode[i].relativeAddress, intermediateCode[i].mnemonic, intermediateCode[i].operand);
+    }
+    printf("+------------------+----------+---------+\n");
+
+    if (errorCount > 0) {
+        printf("\nErrors:\n");
+        for (int i = 0; i < errorCount; i++) {
+            printf("%s\n", errors[i]);
+        }
+    }
+}
+
+int main() {
+    FILE *file = fopen("instructions.txt", "r");
+    if (!file) {
+        printf("Error: The file 'instructions.txt' was not found.\n");
+        return 1;
+    }
+
+    char line[100];
+    while (fgets(line, sizeof(line), file)) {
+        char mnemonic[10], operand[10] = "";
+        sscanf(line, "%s %s", mnemonic, operand);
+
+        int motIndex = getMOTIndex(mnemonic);
+        if (motIndex == -1) {
+            snprintf(errors[errorCount++], sizeof(errors[errorCount]), "Error: Instruction '%s' not in Op Code Table.", mnemonic);
+            continue;
+        }
+
+        strcpy(intermediateCode[intermediateCount].mnemonic, mnemonic);
+        strcpy(intermediateCode[intermediateCount].operand, operand);
+        intermediateCode[intermediateCount++].relativeAddress = relativeAddress;
+
+        if (isalpha(operand[0])) addSymbol(operand);
+        else addLiteral(operand);
+
+        relativeAddress += mot[motIndex].size;
+    }
+
+    fclose(file);
+
+    // Assign addresses to literals
+    for (int i = 0; i < literalCount; i++) {
+        literalTable[i].address = relativeAddress++;
+    }
+
+    printTables();
+
+    return 0;
+}
