@@ -1,0 +1,274 @@
+#include <stdio.h>
+#include <string.h>
+
+
+
+// Mnemonic Operation Table (MOT) for IS (Imperative Statements)
+
+typedef struct {
+
+    char mnemonic[10];
+
+    int opcode;
+
+} MOT;
+
+
+
+MOT motOpCode[] = {
+
+    {"MOV", 1}, {"ADD", 2}, {"SUB", 3}, {"MUL", 4}, {"DIV", 5},
+
+    {"AND", 6}, {"OR", 7}, {"LOAD", 8}, {"STORE", 9}, {"DCR", 10},
+
+    {"INC", 11}, {"JMP", 12}, {"JNZ", 13}, {"HALT", 14}
+
+};
+
+
+
+// Symbol Table
+
+typedef struct {
+
+    char symbol[10];
+
+    int address;
+
+} Symbol;
+
+
+
+Symbol symbolTable[] = {
+
+    {"B", 4}, {"C", 6}, {"D", 8}, {"E", 10},
+
+    {"F", 12}, {"G", 14}, {"H", 16}, {"I", 18},
+
+    {"J", 19}, {"K", 20}
+
+};
+
+
+
+// Literal Table
+
+typedef struct {
+
+    int index;
+
+    char value[10];
+
+    int address;
+
+} Literal;
+
+
+
+Literal literalTable[] = {
+
+    {0, "100", 25}, {1, "200", 26}
+
+};
+
+
+
+// Intermediate Code Table
+
+typedef struct {
+
+    int relativeAddress;
+
+    char mnemonic[10];
+
+    char operand[10];
+
+} Intermediate;
+
+
+
+Intermediate intermediateCode[] = {
+
+    {2, "ADD", "B"}, {4, "SUB", "C"}, {6, "MUL", "D"},
+
+    {8, "DIV", "E"}, {10, "AND", "F"}, {12, "OR", "G"},
+
+    {14, "LOAD", "H"}, {16, "STORE", "I"}, {18, "DCR", "J"},
+
+    {19, "INC", "K"}, {20, "JMP", "#100"}, {22, "JNZ", "#200"},
+
+    {24, "HALT", ""}
+
+};
+
+
+
+// Function to convert an integer to a binary string
+
+void int_to_binary(int num, char *binary, int bits) {
+
+    binary[bits] = '\0';
+
+    for (int i = bits - 1; i >= 0; i--) {
+
+        binary[i] = (num % 2) ? '1' : '0';
+
+        num /= 2;
+
+    }
+
+}
+
+
+
+int get_opcode(char *mnemonic) {
+
+    for (int i = 0; i < sizeof(motOpCode) / sizeof(MOT); i++) {
+
+        if (strcmp(mnemonic, motOpCode[i].mnemonic) == 0) {
+
+            return motOpCode[i].opcode;
+
+        }
+
+    }
+
+    return -1; // Invalid mnemonic
+
+}
+
+
+
+int get_symbol_address(char *symbol) {
+
+    for (int i = 0; i < sizeof(symbolTable) / sizeof(Symbol); i++) {
+
+        if (strcmp(symbol, symbolTable[i].symbol) == 0) {
+
+            return symbolTable[i].address;
+
+        }
+
+    }
+
+    return -1; // Undefined symbol
+
+}
+
+
+
+int get_literal_address(char *literalValue) {
+
+    for (int i = 0; i < sizeof(literalTable) / sizeof(Literal); i++) {
+
+        if (strcmp(literalValue, literalTable[i].value) == 0) {
+
+            return literalTable[i].address;
+
+        }
+
+    }
+
+    return -1; // Undefined literal
+
+}
+
+
+
+void generate_machine_code() {
+
+    printf("+------------------+----------+---------+-----------------------+\n");
+
+    printf("| Relative Address | Mnemonic | Operand |     Machine Code     |\n");
+
+    printf("+------------------+----------+---------+-----------------------+\n");
+
+
+
+    for (int i = 0; i < sizeof(intermediateCode) / sizeof(Intermediate); i++) {
+
+        int relativeAddress = intermediateCode[i].relativeAddress;
+
+        char *mnemonic = intermediateCode[i].mnemonic;
+
+        char *operand = intermediateCode[i].operand;
+
+
+
+        int opcode = get_opcode(mnemonic);
+
+        if (opcode == -1) {
+
+            printf("| %-16d | %-8s | %-7s | %-21s |\n", relativeAddress, mnemonic, operand, "INVALID");
+
+            continue;
+
+        }
+
+
+
+        char opcodeBinary[5];
+
+        int_to_binary(opcode, opcodeBinary, 4);  // 4 bits for opcode
+
+
+
+        if (strcmp(mnemonic, "HALT") == 0) {
+
+            printf("| %-16d | %-8s | %-7s | %-21s |\n", relativeAddress, mnemonic, "", opcodeBinary);
+
+        } else if (operand[0] == '#') {  // Literal operand
+
+            int literalAddress = get_literal_address(&operand[1]);
+
+            if (literalAddress != -1) {
+
+                char addressBinary[9];
+
+                int_to_binary(literalAddress, addressBinary, 8);  // 8 bits for address
+
+                printf("| %-16d | %-8s | %-7s | %-4s %-15s |\n", relativeAddress, mnemonic, operand, opcodeBinary, addressBinary);
+
+            } else {
+
+                printf("| %-16d | %-8s | %-7s | %-21s |\n", relativeAddress, mnemonic, operand, "UNDEFINED_LITERAL");
+
+            }
+
+        } else {  // Symbol operand
+
+            int symbolAddress = get_symbol_address(operand);
+
+            if (symbolAddress != -1) {
+
+                char addressBinary[9];
+
+                int_to_binary(symbolAddress, addressBinary, 8);  // 8 bits for address
+
+                printf("| %-16d | %-8s | %-7s | %-4s %-15s |\n", relativeAddress, mnemonic, operand, opcodeBinary, addressBinary);
+
+            } else {
+
+                printf("| %-16d | %-8s | %-7s | %-21s |\n", relativeAddress, mnemonic, operand, "UNDEFINED_SYMBOL");
+
+            }
+
+        }
+
+    }
+
+
+
+    printf("+------------------+----------+---------+-----------------------+\n");
+
+}
+
+
+
+int main() {
+
+    generate_machine_code();
+
+    return 0;
+
+}
