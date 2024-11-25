@@ -1,0 +1,369 @@
+#include <stdio.h>
+
+#include <string.h>
+
+#include <stdlib.h>
+
+
+
+#define MAX_LINES 100
+
+#define MAX_PARAMS 10
+
+#define MAX_NAME_LEN 50
+
+#define MAX_CODE_LEN 100
+
+
+
+// Macro Definition Table (MDT)
+
+char MDT[MAX_LINES][MAX_CODE_LEN];
+
+int mdt_index = 0;
+
+
+
+// Macro Name Table (MNT)
+
+struct MNT {
+
+    char name[MAX_NAME_LEN];
+
+    int mdt_index;
+
+} MNT[MAX_LINES];
+
+int mnt_count = 0;
+
+
+
+// Parameter Name Table (PNTAB)
+
+struct PNTAB {
+
+    char name[MAX_PARAMS][MAX_NAME_LEN];
+
+    int count;
+
+} PNTAB[MAX_LINES];
+
+int pntab_count = 0;
+
+
+
+void add_macro(char macro_name[], char params[][MAX_NAME_LEN], int param_count) {
+
+    // Add to MNT
+
+    strcpy(MNT[mnt_count].name, macro_name);
+
+    MNT[mnt_count].mdt_index = mdt_index;
+
+    mnt_count++;
+
+
+
+    // Add parameters to PNTAB
+
+    for (int i = 0; i < param_count; i++) {
+
+        strcpy(PNTAB[pntab_count].name[i], params[i]);
+
+    }
+
+    PNTAB[pntab_count].count = param_count;
+
+    pntab_count++;
+
+
+
+    // Add MACRO definition to MDT
+
+    sprintf(MDT[mdt_index], "MACRO %s", macro_name);
+
+    for (int i = 0; i < param_count; i++) {
+
+        strcat(MDT[mdt_index], " ");
+
+        strcat(MDT[mdt_index], params[i]);
+
+    }
+
+    mdt_index++;
+
+}
+
+
+
+void add_macro_line(char line[]) {
+
+    strcpy(MDT[mdt_index], line);
+
+    mdt_index++;
+
+}
+
+
+
+void end_macro() {
+
+    strcpy(MDT[mdt_index], "MEND");
+
+    mdt_index++;
+
+}
+
+
+
+int find_macro(char macro_name[]) {
+
+    for (int i = 0; i < mnt_count; i++) {
+
+        if (strcmp(MNT[i].name, macro_name) == 0) {
+
+            return MNT[i].mdt_index;
+
+        }
+
+    }
+
+    return -1;
+
+}
+
+
+
+void expand_macro(char macro_name[], char arguments[][MAX_NAME_LEN]) {
+
+    int macro_index = find_macro(macro_name);
+
+    if (macro_index == -1) return;
+
+
+
+    int param_count = PNTAB[macro_index].count;
+
+
+
+    // Replace parameters in MDT with arguments
+
+    for (int i = macro_index + 1; i < MAX_LINES; i++) {
+
+        if (strcmp(MDT[i], "MEND") == 0) break;
+
+
+
+        char line[MAX_CODE_LEN];
+
+        strcpy(line, MDT[i]);
+
+
+
+        for (int j = 0; j < param_count; j++) {
+
+            char *param_position = strstr(line, PNTAB[macro_index].name[j]);
+
+            if (param_position != NULL) {
+
+                *param_position = '\0';  // Split line at parameter
+
+                strcat(line, arguments[j]);
+
+                strcat(line, param_position + strlen(PNTAB[macro_index].name[j]));
+
+            }
+
+        }
+
+
+
+        // Check if the line is non-empty before printing
+
+        if (strlen(line) > 0) {
+
+            printf("%s\n", line);
+
+        }
+
+    }
+
+}
+
+
+
+// Function to print tables in a tabular format
+
+void print_tables() {
+
+    printf("\n%-25s\n", "Macro Definition Table (MDT):");
+
+    printf("%-10s%-20s\n", "Index", "Definition");
+
+    for (int i = 0; i < mdt_index; i++) {
+
+        printf("%-10d%-20s\n", i, MDT[i]);
+
+    }
+
+
+
+    printf("\n%-25s\n", "Macro Name Table (MNT):");
+
+    printf("%-10s%-15s\n", "Name", "MDT Index");
+
+    for (int i = 0; i < mnt_count; i++) {
+
+        printf("%-10s%-15d\n", MNT[i].name, MNT[i].mdt_index);
+
+    }
+
+
+
+    printf("\n%-25s\n", "Parameter Name Table (PNTAB):");
+
+    printf("%-10s%-20s\n", "Macro Name", "Parameters");
+
+    for (int i = 0; i < pntab_count; i++) {
+
+        printf("%-10s", MNT[i].name);
+
+        for (int j = 0; j < PNTAB[i].count; j++) {
+
+            printf("%s ", PNTAB[i].name[j]);
+
+        }
+
+        printf("\n");
+
+    }
+
+}
+
+
+
+int main() {
+
+    // Example input
+
+    char code[][MAX_CODE_LEN] = {
+
+        "MACRO ADD &ARG1 &ARG2",
+
+        "LDA &ARG1",
+
+        "ADD &ARG2",
+
+        "STA RESULT",
+
+        "MEND",
+
+        "MACRO MULT &ARG1 &ARG2",
+
+        "MUL &ARG1",
+
+        "MUL &ARG2",
+
+        "STA RESULT",
+
+        "MEND",
+
+        "MACRO SUBTRACT &ARG1 &ARG2",
+
+        "LDA &ARG1",
+
+        "SUB &ARG2",
+
+        "STA RESULT",
+
+        "MEND",
+
+        "START",
+
+        "ADD NUM1 NUM2",
+
+        "MULT NUM3 NUM4",
+
+        "SUBTRACT NUM5 NUM6",
+
+        "END"
+
+    };
+
+
+
+    int line_count = sizeof(code) / sizeof(code[0]);
+
+
+
+    // Process the input lines
+
+    for (int i = 0; i < line_count; i++) {
+
+        char *line = code[i];
+
+        char tokens[MAX_PARAMS][MAX_NAME_LEN];
+
+        int token_count = 0;
+
+
+
+        // Tokenize the input line
+
+        char *token = strtok(line, " ");
+
+        while (token != NULL) {
+
+            strcpy(tokens[token_count++], token);
+
+            token = strtok(NULL, " ");
+
+        }
+
+
+
+        if (token_count == 0) continue;
+
+
+
+        // Macro definition start
+
+        if (strcmp(tokens[0], "MACRO") == 0) {
+
+            add_macro(tokens[1], tokens + 2, token_count - 2);
+
+        }
+
+        // Macro definition end
+
+        else if (strcmp(tokens[0], "MEND") == 0) {
+
+            end_macro();
+
+        }
+
+        // Macro definition body
+
+        else if (find_macro(tokens[0]) != -1) {
+
+            expand_macro(tokens[0], tokens + 1);
+
+        } else {
+
+            printf("%s\n", line);
+
+        }
+
+    }
+
+
+
+    // Print tables
+
+    print_tables();
+
+
+
+    return 0;
+
+}
