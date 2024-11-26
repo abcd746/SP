@@ -1,0 +1,106 @@
+import java.io.*;
+import java.util.*;
+
+public class Main {
+
+    private static final int MAX_LENGTH = 100;
+    private static List<String> keywords = new ArrayList<>();
+
+    // Function to load keywords from file
+    public static void loadKeywords(String filename) {
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                keywords.add(line.trim());
+            }
+        } catch (IOException e) {
+            System.out.println("Error: Could not open keywords file.");
+            System.exit(1);
+        }
+    }
+
+    // Checks if a character is a delimiter
+    public static boolean isDelimiter(char chr) {
+        return " +-*/%,;><=()[]{}!".indexOf(chr) != -1;
+    }
+
+    // Checks if a character is an operator
+    public static boolean isOperator(char chr) {
+        return "+-*/><=".indexOf(chr) != -1;
+    }
+
+    // Checks if a string is a valid identifier
+    public static boolean isValidIdentifier(String str) {
+        if (str.isEmpty() || Character.isDigit(str.charAt(0)) || isDelimiter(str.charAt(0))) {
+            return false;
+        }
+        return true;
+    }
+
+    // Checks if a string is a keyword
+    public static boolean isKeyword(String str) {
+        return keywords.contains(str);
+    }
+
+    // Checks if a string is an integer
+    public static boolean isInteger(String str) {
+        if (str == null || str.isEmpty()) return false;
+        for (char ch : str.toCharArray()) {
+            if (!Character.isDigit(ch)) return false;
+        }
+        return true;
+    }
+
+    // Trims a substring from a given string's start and end position
+    public static String getSubstring(String str, int start, int end) {
+        return str.substring(start, end + 1);
+    }
+
+    // Parses and analyzes the input
+    public static void lexicalAnalyzer(String input) {
+        int left = 0, right = 0;
+        int len = input.length();
+
+        while (right <= len && left <= right) {
+            if (right < len && !isDelimiter(input.charAt(right))) {
+                right++;
+            }
+
+            if ((right < len && isDelimiter(input.charAt(right)) && left == right)
+                    || right == len) {
+                if (right < len && isOperator(input.charAt(right))) {
+                    System.out.println("Token: Operator, Value: " + input.charAt(right));
+                }
+                right++;
+                left = right;
+            } else if ((right < len && isDelimiter(input.charAt(right)) && left != right)
+                    || (right == len && left != right)) {
+                String subStr = getSubstring(input, left, right - 1);
+
+                if (isKeyword(subStr)) {
+                    System.out.println("Token: Keyword, Value: " + subStr);
+                } else if (isInteger(subStr)) {
+                    System.out.println("Token: Integer, Value: " + subStr);
+                } else if (isValidIdentifier(subStr)) {
+                    System.out.println("Token: Identifier, Value: " + subStr);
+                } else {
+                    System.out.println("Token: Unidentified, Value: " + subStr);
+                }
+                left = right;
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        // Load keywords from file
+        loadKeywords("keywords.txt");
+
+        // Get input expression from user
+        Scanner scanner = new Scanner(System.in);
+        System.out.print("Enter an expression to analyze: ");
+        String input = scanner.nextLine();
+
+        System.out.println("\nAnalyzing Expression \"" + input + "\":");
+        lexicalAnalyzer(input);
+    }
+}
